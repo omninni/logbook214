@@ -144,6 +144,9 @@ public final class AppConfigBean {
     /** 全てのネットワークインターフェースで受け付ける */
     private boolean closeOutsidePort = true;
 
+    /** 全てのネットワークインターフェースで受け付ける(Webサーバ) */
+    private boolean closeWebOutsidePort = true;
+
     /** 戦闘結果をログ出力するか */
     private boolean printSortieLog = false;
 
@@ -342,6 +345,9 @@ public final class AppConfigBean {
 
     /** 遠征報告書を読みこむか */
     private boolean loadMissionLog = true;
+
+    /** 中華モード？ */
+    private boolean chinaMode = false;
 
     /** システムワイドホットキー (Windowsのみ対応) 0:なし, 1:Ctrl+Shift+z, 2:Win+Z */
     private int systemWideHotKey = 0;
@@ -1813,6 +1819,20 @@ public final class AppConfigBean {
     }
 
     /**
+     * @return chinaMode
+     */
+    public boolean isChinaMode() {
+        return this.chinaMode;
+    }
+
+    /**
+     * @param chinaMode セットする chinaMode
+     */
+    public void setChinaMode(boolean chinaMode) {
+        this.chinaMode = chinaMode;
+    }
+
+    /**
      * @return systemWideHotKey
      */
     public int getSystemWideHotKey() {
@@ -1995,6 +2015,20 @@ public final class AppConfigBean {
     }
 
     /**
+     * @return closeWebOutsidePort
+     */
+    public boolean isCloseWebOutsidePort() {
+        return this.closeWebOutsidePort;
+    }
+
+    /**
+     * @param closeWebOutsidePort セットする closeWebOutsidePort
+     */
+    public void setCloseWebOutsidePort(boolean closeWebOutsidePort) {
+        this.closeWebOutsidePort = closeWebOutsidePort;
+    }
+
+    /**
      * @return noticeCondOnlyMainFleet
      */
     public boolean isNoticeCondOnlyMainFleet() {
@@ -2035,5 +2069,4 @@ public final class AppConfigBean {
     public void setToolButtons(List<String> toolButtons) {
         this.toolButtons = toolButtons;
     }
-
 }

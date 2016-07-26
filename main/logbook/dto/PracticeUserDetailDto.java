@@ -4,6 +4,7 @@
 package logbook.dto;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 import javax.json.JsonArray;
@@ -25,6 +26,8 @@ public class PracticeUserDetailDto extends PracticeUserDto {
 
     /** ships level */
     private final int[] shipsLevel = { 1, 1, 1, 1, 1, 1 };
+
+    private final Date lastUpdate = new Date();
 
     public PracticeUserDetailDto(JsonObject obj) {
         super(obj.getInt("api_member_id"),
@@ -74,6 +77,13 @@ public class PracticeUserDetailDto extends PracticeUserDto {
      */
     public int[] getShipsLevel() {
         return this.shipsLevel;
+    }
+
+    /**
+     * @return lastUpdate
+     */
+    public Date getLastUpdate() {
+        return lastUpdate;
     }
 
 }

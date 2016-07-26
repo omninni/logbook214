@@ -35,6 +35,7 @@ import logbook.internal.EnemyData;
 import logbook.internal.LoggerHolder;
 import logbook.internal.MasterData;
 import logbook.internal.ShipParameterRecord;
+import logbook.internal.RemodelItemData;
 import logbook.scripting.ScriptData;
 import logbook.util.SwtUtils;
 
@@ -103,6 +104,7 @@ public final class AsyncExecApplicationMain extends Thread {
                             // 更新日時が実装されているファイルたちはすぐに保存
                             ShipGroupConfig.store();
                             MasterData.store();
+                    		RemodelItemData.store();
                             EnemyData.store();
                             ShipParameterRecord.store();
                             ScriptData.store();

@@ -19,6 +19,7 @@ import logbook.dto.DockDto;
 import logbook.dto.ItemDto;
 import logbook.dto.ItemInfoDto;
 import logbook.dto.ShipDto;
+import logbook.gui.logic.HelperJson;
 import logbook.gui.logic.ColorManager;
 import logbook.gui.logic.DamageRate;
 import logbook.gui.logic.SakutekiString;
@@ -36,14 +37,23 @@ import logbook.util.SwtUtils;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.StyleRange;
 import org.eclipse.swt.custom.StyledText;
+import org.eclipse.swt.dnd.Clipboard;
+import org.eclipse.swt.dnd.TextTransfer;
+import org.eclipse.swt.dnd.Transfer;
+import org.eclipse.swt.events.SelectionAdapter;
+import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.RGB;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.Menu;
+import org.eclipse.swt.widgets.MenuItem;
+import org.eclipse.swt.widgets.ToolTip;
 import org.eclipse.wb.swt.SWTResourceManager;
 
 /**
@@ -124,6 +134,10 @@ public class FleetComposite extends Composite {
     private final Label[] timeLabels = new Label[MAXCHARA];
     /** メッセージ */
     private final StyledText message;
+
+    /** 右クリックメニュー */
+    private Menu menu;
+    private MenuItem copyFleetItem;
 
     /** 時間表示系の更新タスク */
     private final List<Runnable> updators = new ArrayList<>();
@@ -247,6 +261,38 @@ public class FleetComposite extends Composite {
             this.nextLabels[i] = next;
             this.timeLabels[i] = time;
         }
+
+        this.menu = new Menu(this);
+        // ウィンドウを閉じる
+        this.copyFleetItem = new MenuItem(this.menu, SWT.NONE);
+        this.copyFleetItem.setText("現在の艦隊編成をコピーする");
+        this.copyFleetItem.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent paramSelectionEvent) {
+                FleetComposite.this.copyFleetSetting();
+            }
+        });
+        setMenu(this, this.menu);
+    }
+
+    private static void setMenu(Control c, Menu ma) {
+        if (c instanceof Composite) {
+            for (final Control cc : ((Composite) c).getChildren()) {
+                setMenu(cc, ma);
+            }
+        }
+        c.setMenu(ma);
+    }
+
+    //
+
+    private void copyFleetSetting() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("\"<名前を入力>\": ");
+        HelperJson.genFleet(sb, this.dock);
+        sb.append(",");
+        Clipboard clipboard = new Clipboard(Display.getDefault());
+        clipboard.setContents(new Object[] { sb.toString() }, new Transfer[] { TextTransfer.getInstance() });
     }
 
     /**
@@ -930,5 +976,4 @@ public class FleetComposite extends Composite {
             this.label.setForeground(SWTResourceManager.getColor(SWT.COLOR_DARK_BLUE));
             this.label.getParent().layout();
         }
-    }
-}
+    }}

@@ -211,6 +211,12 @@ public final class ConfigDialog extends Dialog {
             }
         });
 
+        new Label(compositeConnection, SWT.NONE);
+        final Button closeWebOutsidePort = new Button(compositeConnection, SWT.CHECK);
+        closeWebOutsidePort.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, false, 3, 1));
+        closeWebOutsidePort.setText("Web外向けポートは閉じておく");
+        closeWebOutsidePort.setSelection(AppConfig.get().isCloseWebOutsidePort());
+
         final Button useProxyButton = new Button(compositeConnection, SWT.CHECK);
         useProxyButton.setLayoutData(new GridData(SWT.LEFT, SWT.CENTER, false, false, 4, 1));
         useProxyButton.setText("接続にプロキシを使用する");
@@ -1084,6 +1090,7 @@ public final class ConfigDialog extends Dialog {
                 AppConfig.get().setUpdateCheck(checkUpdate.getSelection());
                 AppConfig.get().setAllowOnlyFromLocalhost(onlyFromLocalhost.getSelection());
                 AppConfig.get().setCloseOutsidePort(closeOutsidePort.getSelection());
+                AppConfig.get().setCloseWebOutsidePort(closeWebOutsidePort.getSelection());
                 // maintab
                 AppConfig.get().setPrintSortieLog(printSortieLog.getSelection());
                 AppConfig.get().setPrintSunkLog(printSunkLog.getSelection());
@@ -1155,8 +1162,8 @@ public final class ConfigDialog extends Dialog {
                 AppConfig.get().setProxyHost(proxyHostText.getText());
                 AppConfig.get().setProxyPort(proxyPortSpinner.getSelection());
                 AppConfig.get().setSendDatabase(sendDatabaseButton.getSelection());
-                AppConfig.get().setDatabaseSendLog(databaseLogButton.getSelection());
                 AppConfig.get().setAccessKey(accessKeyText.getText());
+                AppConfig.get().setDatabaseSendLog(databaseLogButton.getSelection());
                 // push notify
                 AppConfig.get().setNotifyProwl(prowl.getSelection());
                 AppConfig.get().setProwlAPIKey(prowlAPIKey.getText());

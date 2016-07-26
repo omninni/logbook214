@@ -50,6 +50,20 @@ public final class ItemTable extends AbstractTableDialog {
             }
         });
         itemCopy.setText("装備名をコピー(&1)");
+
+        MenuItem saveItemCopy = new MenuItem(this.tablemenu, SWT.NONE);
+        saveItemCopy.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                StringBuilder sb = new StringBuilder();
+                for (TableItem item : ItemTable.this.table.getSelection()) {
+                    sb.append("\"").append(item.getText(1)).append("\": ").append(item.getText(3)).append(",\n\t\t");
+                }
+                Clipboard clipboard = new Clipboard(Display.getDefault());
+                clipboard.setContents(new Object[] { sb.toString() }, new Transfer[] { TextTransfer.getInstance() });
+            }
+        });
+        saveItemCopy.setText("装備維持設定をコピー");
     }
 
     @Override

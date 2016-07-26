@@ -5,6 +5,8 @@ package logbook.dto;
 
 import javax.json.JsonObject;
 
+import logbook.config.AppConfig;
+
 /**
  * @author Nekopanda
  *

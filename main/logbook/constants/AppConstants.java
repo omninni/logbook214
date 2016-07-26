@@ -21,17 +21,17 @@ public class AppConstants {
     public static final String NAME = "航海日誌";
 
     /** 派生版の名前 */
-    public static final String SUFFIX = "拡張版";
+    public static final String SUFFIX = "ねこ版";
 
     /** バージョン */
     public static final String VERSION = "2.1.4";
 
     /** ホームページ */
-    public static final URI HOME_PAGE_URI = URI.create("http://nekopanda.blog.jp/");
+    public static final URI HOME_PAGE_URI = URI.create("http://jbbs.shitaraba.net/netgame/13966/");
 
     /** アップデートチェック先 */
     public static final URI UPDATE_CHECK_URI = URI
-            .create("http://nekopandanet.sakura.ne.jp/logbook/version/okversions.txt");
+            .create("https://googledrive.com/host/0B83tioTzFacPOHprNndpS09yNms/okversions.txt");
 
     /** 日付書式 */
     public static final String DATE_FORMAT = "yyyy-MM-dd HH:mm:ss";
@@ -196,6 +196,9 @@ public class AppConstants {
 
     /** 所有艦娘グループ設定ファイル  */
     public static final File GROUP_CONFIG_FILE = new File("./config/group.xml");
+
+    /** 改修工廠データファイル  */
+    public static final File REMODEL_DATA_FILE = new File("./config/remodeldata.xml");
 
     /** 敵データファイル  */
     public static final File ENEMY_DATA_FILE = new File("./config/EnemyFleetRecord.csv");

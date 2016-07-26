@@ -44,11 +44,13 @@ import logbook.internal.EnemyData;
 import logbook.internal.Item;
 import logbook.internal.LoggerHolder;
 import logbook.internal.MasterData;
+import logbook.internal.RemodelItemData;
 import logbook.internal.Ship;
 import logbook.internal.ShipParameterRecord;
 import logbook.scripting.ScriptData;
 import logbook.server.proxy.DatabaseClient;
 import logbook.server.proxy.ProxyServer;
+import logbook.server.web.WebServer;
 import logbook.thread.ThreadManager;
 import logbook.thread.ThreadStateObserver;
 import logbook.util.JIntellitypeWrapper;
@@ -192,6 +194,7 @@ public final class ApplicationMain extends WindowBase {
                 ShipGroupConfig.store();
                 UserDataConfig.store();
                 MasterData.store();
+                RemodelItemData.store();
                 EnemyData.store();
                 ShipParameterRecord.store();
                 ScriptData.store();
@@ -1399,6 +1402,7 @@ public final class ApplicationMain extends WindowBase {
         SWTResourceManager.dispose();
         // プロキシサーバーをシャットダウンする
         ProxyServer.end();
+        WebServer.end();
         DatabaseClient.end();
         // ホットキーを解除
         JIntellitypeWrapper.cleanup();
@@ -1491,6 +1495,8 @@ public final class ApplicationMain extends WindowBase {
         JIntellitypeWrapper.changeSetting(AppConfig.get().getSystemWideHotKey());
         // プロキシサーバ再起動
         ProxyServer.restart();
+        // Webサーバ再起動
+        WebServer.restart();
     }
 
     public void setTitleText(String newText) {

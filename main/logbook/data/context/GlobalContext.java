@@ -60,6 +60,8 @@ import logbook.internal.CondTiming;
 import logbook.internal.Item;
 import logbook.internal.LoggerHolder;
 import logbook.internal.MasterData;
+import logbook.internal.MasterData.MissionDto;
+import logbook.internal.RemodelItemData;
 import logbook.internal.Ship;
 import logbook.internal.ShipParameterRecord.UpdateShipParameter;
 import logbook.scripting.EventListenerProxy;
@@ -141,14 +143,17 @@ public final class GlobalContext {
     /** 演習リスト */
     private static PracticeUserDto[] practiceUser = new PracticeUserDto[] { null, null, null, null, null };
 
+    /** 選択中の演習相手 */
+    private static PracticeUserDto selectedPracticeUser = null;
+
     /** 最後に演習リストが更新された時間 */
-    private static Date practiceUserLastUpdate = null;
+    private static Date practiceUserLastUpdate = new Date(0);;
 
     /** 任務Map */
     private static ArrayList<QuestDto> questList = new ArrayList<QuestDto>();
 
     /** 最後に任務情報を受け取った時間 */
-    private static Date questLastUpdate;
+    private static Date questLastUpdate = new Date(0);
 
     /** 出撃中か */
     private static boolean[] isSortie = new boolean[4];
@@ -159,17 +164,31 @@ public final class GlobalContext {
     /**　ユーザ基本情報 */
     private static BasicInfoDto basic;
 
+    /** 最後に母港情報を受け取った時間 */
+    private static Date lastPortUpdate = new Date(0);
+
     /** updateContext() が呼ばれた数 */
     private static int updateCounter = 0;
+
+    private static final Counter counter = new Counter();
+
+    /** 艦これサーバとの時刻誤差 */
+    private static long serverTimeDiff = 0;
 
     /** 保有資源・資材 */
     private static MaterialDto material = null;
 
     /** 最後に資源ログに追加した時間 */
-    volatile private static Date materialLogLastUpdate = null;
+    volatile private static Date materialLogLastUpdate = new Date(0);;
 
     /** 連合艦隊 */
-    private static boolean combined;
+    private static int combineFlag = 0;
+
+    /** 装備アイテム順 */
+    private static Map<Integer, List<Integer>> unsetSlots = new HashMap<>();
+
+    /** 任務最大同時受注数 */
+    private static int parallelQuestCount = 5;
 
     /** 情報の取得状態 0:母港情報未受信 1:正常 2:マスターデータの更新が必要 3:アカウントが変わった！   */
     private static int state = 0;
@@ -215,6 +234,15 @@ public final class GlobalContext {
                 GlobalContext.itemMap.put(item.getId(), item);
             }
         }
+        KdockDto[] kdocks = config.getKdocks();
+        if (kdocks != null) {
+            for (int i = 0; i < kdocks.length; ++i) {
+                if (kdocks[i] == null) {
+                    kdocks[i] = KdockDto.EMPTY;
+                }
+            }
+            GlobalContext.kdocks = kdocks;
+        }
         DeckMissionDto[] previousMissions = config.getPreviousMissions();
         if (previousMissions != null) {
             for (int i = 0; i < previousMissions.length; ++i) {
@@ -259,7 +287,20 @@ public final class GlobalContext {
     }
 
     /**
-     * 艦娘Map
+     * @return unsetSlots
+     */
+    public static Map<Integer, List<Integer>> getUnsetSlots() {
+        return unsetSlots;
+    }
+
+    /**
+     * @param unsetSlots2
+     */
+    public static void setUnsetSlots(Map<Integer, List<Integer>> unsetSlots2) {
+        unsetSlots = unsetSlots2;
+    }
+
+    /**
      * @return 艦娘Map
      */
     public static Map<Integer, ShipDto> getShipMap() {
@@ -567,7 +608,11 @@ public final class GlobalContext {
      * @return 連合艦隊を組んでいるか
      */
     public static boolean isCombined() {
-        return combined;
+        return combineFlag != 0;
+    }
+
+    public static int getCombineFlag() {
+        return combineFlag;
     }
 
     /**
@@ -579,10 +624,38 @@ public final class GlobalContext {
     }
 
     /**
+     * @return lastPortUpdate
+     */
+    public static Date getLastPortUpdate() {
+        return lastPortUpdate;
+    }
+
+    /**
+     * @return parallelQuestCount
+     */
+    public static int getParallelQuestCount() {
+        return parallelQuestCount;
+    }
+
+    /**
      * @return condTiming
      */
     public static CondTiming getCondTiming() {
         return condTiming;
+    }
+
+    /**
+     * @return counter
+     */
+    public static Counter getCounter() {
+        return counter;
+    }
+
+    /**
+     * @return serverTimeDiff
+     */
+    public static long getServerTimeDiff() {
+        return serverTimeDiff;
     }
 
     /**
@@ -660,6 +733,10 @@ public final class GlobalContext {
         case MATERIAL:
             doMaterial(data);
             break;
+        // 遠征(開始)
+        case MISSION_START:
+            doMissionStart(data);
+            break;
         // 遠征(帰還)
         case MISSION_RESULT:
             doMissionResult(data);
@@ -711,6 +788,14 @@ public final class GlobalContext {
         // 装備改修
         case REMODEL_SLOT:
             doRemodelSlot(data);
+            break;
+        // 改修工廠装備アイテムリスト
+        case REMODEL_SLOTLIST:
+            doRemodelSlotlist(data);
+            break;
+        // 装備改修詳細
+        case REMODEL_SLOTLIST_DETAIL:
+            doRemodelSlotDetail(data);
             break;
         // 海戦
         case BATTLE:
@@ -835,6 +920,10 @@ public final class GlobalContext {
         case NYUKYO_SPEEDCHANGE:
             doSpeedChange(data);
             break;
+        // 装備アイテム順
+        case UNSETSLOT:
+            doUnsetSlot(data);
+            break;
         // 改造
         case REMODELING:
             doRemodeling(data);
@@ -919,6 +1008,19 @@ public final class GlobalContext {
                         }
                     }
                 }
+
+                // 資材を反映
+                JsonArray materials = apidata.getJsonArray("api_material");
+                if (material != null) {
+                    material.setFuel(materials.getInt(0));
+                    material.setAmmo(materials.getInt(1));
+                    material.setMetal(materials.getInt(2));
+                    material.setBauxite(materials.getInt(3));
+                    material.setTime(new Date());
+                }
+
+                counter.incrementHokyu();
+
                 addUpdateLog("補給しました");
             }
         } catch (Exception e) {
@@ -1168,13 +1270,19 @@ public final class GlobalContext {
                 //addConsole("遠征情報を更新しました");
 
                 // 連合艦隊を更新する
-                combined = false;
+                combineFlag = 0;
                 if (apidata.containsKey("api_combined_flag")) {
-                    combined = (apidata.getInt("api_combined_flag") != 0);
+                    combineFlag = apidata.getJsonNumber("api_combined_flag").intValue();
                     //addConsole("連合艦隊を更新しました");
                 }
 
+                // 任務同時受注数
+                if (apidata.containsKey("api_parallel_quest_count")) {
+                    parallelQuestCount = apidata.getInt("api_parallel_quest_count");
+                }
+
                 updateShipParameter.sortieEnd();
+                lastPortUpdate = new Date();
                 state = checkDataState(endSortie);
 
                 addUpdateLog("母港情報を更新しました");
@@ -1340,6 +1448,13 @@ public final class GlobalContext {
                         shipMap.put(dropShip.getId(), dropShip);
                     }
                 }
+                else {
+                    // 演習相手状態を更新
+                    if (selectedPracticeUser != null) {
+                        // 今のところ0かどうかでしか判定していない
+                        selectedPracticeUser.setState(1);
+                    }
+                }
 
                 // 警告を出すためにバージョンアップ
                 battle.getDock().setUpdate(true);
@@ -1415,6 +1530,8 @@ public final class GlobalContext {
                     res, secretary, hqLevel, -1);
             lastBuildKdock = kdockid;
             getShipResource.put(kdockid, resource);
+
+            counter.incrementKenzo();
 
             // 資源に反映させてレポート
             updateDetailedMaterial("建造", res, MATERIAL_DIFF.CONSUMED);
@@ -1548,6 +1665,8 @@ public final class GlobalContext {
                     createitem.setName(item.getName());
                     createitem.setType(item.getTypeName());
                     createItemList.add(createitem);
+                    unsetSlots.put(apidata.getInt("api_type3"),
+                            unsetslotToList(apidata.get("api_unsetslot")));
                 }
             } else {
                 createItemList.add(createitem);
@@ -1559,6 +1678,7 @@ public final class GlobalContext {
             ResourceItemDto items = new ResourceItemDto();
             items.loadMaterialFronJson(newMaterial);
             updateDetailedMaterial("装備開発", items, MATERIAL_DIFF.NEW_VALUE);
+            counter.incrementKaihatsu();
 
             //state = checkDataState();
 
@@ -1617,6 +1737,12 @@ public final class GlobalContext {
 
             // 艦隊を設定
             doDeck(apidata.getJsonArray("api_deck_data"));
+
+            // 装備順
+            if (JsonUtils.hasKey(apidata, "api_slot_data")) {
+                JsonObject slotdata = apidata.getJsonObject("api_slot_data");
+                doUnsetSlotSub(slotdata);
+            }
 
             if (battle != null) {
                 ApplicationMain.main.updateSortieDock();
@@ -1771,7 +1897,7 @@ public final class GlobalContext {
 
                 // 持っている装備を廃棄する
                 for (int item : ship.getItemId()) {
-                    itemMap.remove(item);
+                    removeSlotItem(item);
                 }
                 // 艦娘を外す
                 shipMap.remove(ship.getId());
@@ -1785,6 +1911,7 @@ public final class GlobalContext {
                     }
                 }
             }
+            counter.incrementKaitai();
 
             addUpdateLog("艦娘を解体しました");
         } catch (Exception e) {
@@ -1807,10 +1934,11 @@ public final class GlobalContext {
                 if (itemDto != null) {
                     dtoList.add(LostEntityDto.make(item, itemDto));
                 }
-                itemMap.remove(item);
+                removeSlotItem(item);
             }
             // 記録する
             CreateReportLogic.storeLostReport(dtoList);
+            counter.incrementHaiki();
             addUpdateLog("装備を廃棄しました");
         } catch (Exception e) {
             LOG.get().warn("装備を廃棄しますに失敗しました", e);
@@ -1833,7 +1961,7 @@ public final class GlobalContext {
                     CreateReportLogic.storeLostReport(LostEntityDto.make(ship, "近代化改修"));
                     // 持っている装備を廃棄する
                     for (int item : ship.getItemId()) {
-                        itemMap.remove(item);
+                        removeSlotItem(item);
                     }
                     // 艦娘を外す
                     shipMap.remove(ship.getId());
@@ -1866,6 +1994,7 @@ public final class GlobalContext {
                 }
             }
             shipMap.put(id, ship);
+            counter.incrementKyoka();
 
             addUpdateLog("近代化改修しました");
         } catch (Exception e) {
@@ -2060,6 +2189,30 @@ public final class GlobalContext {
     }
 
     /**
+     * 遠征(開始)を更新します
+     *
+     * @param data
+     */
+    private static void doMissionStart(Data data) {
+        try {
+            int missionId = Integer.parseInt(data.getField("api_mission_id"));
+            JsonObject apidata = data.getJsonObject().getJsonObject("api_data");
+            long compTime = apidata.getJsonNumber("api_complatetime").longValue();
+
+            MissionDto mission = MasterData.getMaster().getMission().get(missionId);
+            if (mission != null) {
+                long missionTime = mission.getTime() * 60 * 1000;
+                serverTimeDiff = (new Date().getTime() + missionTime) - compTime;
+                addUpdateLog("サーバ時刻との差: " + serverTimeDiff + "ミリ秒");
+            }
+
+        } catch (Exception e) {
+            LOG.get().warn("遠征(開始)を更新しますに失敗しました", e);
+            LOG.get().warn(data);
+        }
+    }
+
+    /**
      * 遠征(帰還)を更新します
      *
      * @param data
@@ -2142,13 +2295,26 @@ public final class GlobalContext {
     private static void doNdockSub(JsonArray apidata) {
         for (int i = 0; i < apidata.size(); i++) {
             JsonObject object = (JsonObject) apidata.get(i);
-            int id = object.getJsonNumber("api_ship_id").intValue();
+            int shipId = object.getJsonNumber("api_ship_id").intValue();
             long milis = object.getJsonNumber("api_complete_time").longValue();
 
             Date time = null;
             if (milis > 0) {
                 time = new Date(milis);
-                ndocks[i] = new NdockDto(id, time);
+                NdockDto prev = ndocks[i];
+                ndocks[i] = new NdockDto(shipId, time);
+
+                // サーバとの時刻の差を計算
+                if (prev.getNdockid() == shipId) {
+                    Date prevTime = prev.getNdocktime();
+                    if ((prevTime != null) && (prevTime.getTime() != milis)) {
+                        ShipDto ship = shipMap.get(shipId);
+                        if (ship != null) {
+                            serverTimeDiff = (prevTime.getTime() + ship.getDocktime()) - milis;
+                            addUpdateLog("サーバ時刻との差: " + serverTimeDiff + "ミリ秒");
+                        }
+                    }
+                }
             }
             else if (ndocks[i].getNdocktime() != null) {
                 ndockFinished(ndocks[i].getNdockid());
@@ -2163,15 +2329,21 @@ public final class GlobalContext {
      */
     private static void doNyukyoStart(Data data) {
         try {
-            int id = Integer.valueOf(data.getField("api_ship_id"));
+            int ndockId = Integer.valueOf(data.getField("api_ndock_id"));
+            int shipId = Integer.valueOf(data.getField("api_ship_id"));
             boolean highspeed = data.getField("api_highspeed").equals("1");
 
             if (highspeed) {
-                ndockFinished(id);
+                // 高速修理の場合は直後にndockは送られてこない
+                ndockFinished(shipId);
             }
+            else {
+                ndocks[ndockId - 1] = new NdockDto(shipId, new Date());
+            }
+            counter.incrementNyukyo();
 
             // 次アップデート
-            ShipDto ship = shipMap.get(id);
+            ShipDto ship = shipMap.get(shipId);
             if (ship != null) {
                 String fleetid = ship.getFleetid();
                 if (fleetid != null) {
@@ -2249,7 +2421,9 @@ public final class GlobalContext {
         try {
             JsonObject apidata = data.getJsonObject().getJsonObject("api_data");
             int items_per_page = 5;
-            int disp_page = apidata.getJsonNumber("api_disp_page").intValue();
+            int disp_page = AppConfig.get().isChinaMode() ?
+                    Integer.valueOf(apidata.getString("api_disp_page")) :
+                    apidata.getJsonNumber("api_disp_page").intValue();
             int page_count = apidata.getJsonNumber("api_page_count").intValue();
             if (page_count == 0) { // 任務が１つもない時
                 questList.clear();
@@ -2341,7 +2515,7 @@ public final class GlobalContext {
                 int id = Integer.parseInt(idstr);
                 isSortie[id - 1] = true;
                 // 連合艦隊
-                if ((id == 1) && combined) {
+                if ((id == 1) && isCombined()) {
                     isSortie[1] = true;
                 }
             }
@@ -2456,7 +2630,7 @@ public final class GlobalContext {
     }
 
     /**
-     * 任務情報を処理します
+     * 遠征情報を処理します
      * 
      * @param data
      */
@@ -2466,8 +2640,9 @@ public final class GlobalContext {
             if (apidata != null) {
                 MasterData.updateMission(apidata);
             }
+            addConsole("遠征情報を更新しました");
         } catch (Exception e) {
-            LOG.get().warn("任務情報更新に失敗しました", e);
+            LOG.get().warn("遠征情報更新に失敗しました", e);
             LOG.get().warn(data);
         }
     }
@@ -2508,7 +2683,7 @@ public final class GlobalContext {
             // 持っている情報をアップデートする
             for (int i = 0; i < 5; ++i) {
                 if ((practiceUser[i] != null) && (practiceUser[i].getId() == dto.getId())) {
-                    practiceUser[i] = dto;
+                    selectedPracticeUser = practiceUser[i] = dto;
                     break;
                 }
             }
@@ -2529,7 +2704,10 @@ public final class GlobalContext {
     private static void doCombined(Data data) {
         try {
             JsonObject apidata = data.getJsonObject().getJsonObject("api_data");
-            combined = (apidata.getInt("api_combined") != 0);
+            combineFlag = 0;
+            if (apidata.getInt("api_combined") != 0) {
+                combineFlag = Integer.valueOf(data.getField("api_combined_type"));
+            }
             for (int i = 0; i < 2; ++i) {
                 DockDto dockdto = dock.get(Integer.toString(i + 1));
                 if (dockdto != null) {
@@ -2540,6 +2718,33 @@ public final class GlobalContext {
         } catch (Exception e) {
             LOG.get().warn("連合艦隊情報更新に失敗しました", e);
             LOG.get().warn(data);
+        }
+    }
+
+    /**
+     * 装備アイテム順を処理します
+     * 
+     * @param data
+     */
+    private static void doUnsetSlot(Data data) {
+        try {
+            JsonObject apidata = data.getJsonObject().getJsonObject("api_data");
+            if (apidata != null) {
+                doUnsetSlotSub(apidata);
+            }
+        } catch (Exception e) {
+            LOG.get().warn("装備アイテム順更新に失敗しました", e);
+            LOG.get().warn(data);
+        }
+    }
+
+    private static void doUnsetSlotSub(JsonObject apidata) {
+        if (apidata != null) {
+            unsetSlots.clear();
+            for (int type : MasterData.getMaster().getEquipType().keySet()) {
+                JsonValue content = apidata.get("api_slottype" + type);
+                unsetSlots.put(type, unsetslotToList(content));
+            }
         }
     }
 
@@ -2559,7 +2764,7 @@ public final class GlobalContext {
                 if (JsonUtils.hasKey(apidata, "api_use_slot_id")) {
                     JsonArray useSlotId = apidata.getJsonArray("api_use_slot_id");
                     for (int i = 0; i < useSlotId.size(); ++i) {
-                        itemMap.remove(useSlotId.getInt(i));
+                        removeSlotItem(useSlotId.getInt(i));
                     }
                 }
 
@@ -2569,10 +2774,57 @@ public final class GlobalContext {
                 items.loadMaterialFronJson(newMaterial);
                 updateDetailedMaterial("装備改修", items, MATERIAL_DIFF.NEW_VALUE);
             }
+            counter.incrementRemodelitem();
 
             addUpdateLog("装備改修情報を更新しました");
         } catch (Exception e) {
             LOG.get().warn("装備改修更新に失敗しました", e);
+            LOG.get().warn(data);
+        }
+    }
+
+    /**
+     * @param data
+     */
+    private static void doRemodelSlotlist(Data data) {
+        try {
+            JsonArray apidata = data.getJsonObject().getJsonArray("api_data");
+            int supportShipId = -1;
+            DockDto firstdock = dock.get("1");
+            if (firstdock != null) {
+                List<ShipDto> ships = firstdock.getShips();
+                if (ships.size() >= 2) {
+                    supportShipId = ships.get(1).getShipId();
+                }
+            }
+
+            RemodelItemData.updateRemodelItemList(apidata, supportShipId);
+
+            addUpdateLog("改修アイテムリストを更新しました");
+        } catch (Exception e) {
+            LOG.get().warn("改修アイテムリストを更新しますに失敗しました", e);
+            LOG.get().warn(data);
+        }
+    }
+
+    /**
+     * 装備改修
+     */
+    private static void doRemodelSlotDetail(Data data) {
+        try {
+            String idStr = data.getField("api_id");
+            String slotIdStr = data.getField("api_slot_id");
+            JsonObject apidata = data.getJsonObject().getJsonObject("api_data");
+            if ((idStr != null) && (slotIdStr != null)) {
+                ItemDto item = itemMap.get(Integer.valueOf(slotIdStr));
+                if (item != null) {
+                    RemodelItemData.updateRemodelItemDetail(
+                            apidata, Integer.valueOf(idStr), item.getLevel());
+                }
+            }
+            addUpdateLog("装備改修詳細を更新しました");
+        } catch (Exception e) {
+            LOG.get().warn("装備改修詳細更新に失敗しました", e);
             LOG.get().warn(data);
         }
     }
@@ -2636,6 +2888,17 @@ public final class GlobalContext {
         return 1; // 正常
     }
 
+    private static List<Integer> unsetslotToList(JsonValue content) {
+        List<Integer> list = new ArrayList<Integer>();
+        if (content instanceof JsonArray) {
+            JsonArray jsonArray = (JsonArray) content;
+            for (int i = 0; i < jsonArray.size(); ++i) {
+                list.add(jsonArray.getInt(i));
+            }
+        }
+        return list;
+    }
+
     /** 艦娘をshipMapに追加 */
     private static void addShip(ShipDto ship) {
         if (nextShipId <= ship.getId()) {
@@ -2657,6 +2920,20 @@ public final class GlobalContext {
             return dto;
         }
         return null;
+    }
+
+    /**
+     * 装備アイテムの削除
+     */
+    private static void removeSlotItem(int id) {
+        ItemDto dto = itemMap.get(id);
+        if (dto != null) {
+            List<Integer> list = unsetSlots.get(dto.getType2());
+            if (list != null) {
+                list.remove((Object) id);
+            }
+            itemMap.remove(id);
+        }
     }
 
     private static void updateDetailedMaterial(String ev, ResourceItemDto res, MATERIAL_DIFF diff) {
@@ -2689,5 +2966,4 @@ public final class GlobalContext {
         if (AppConfig.get().isPrintUpdateLog()) {
             addConsole(message);
         }
-    }
-}
+    }}

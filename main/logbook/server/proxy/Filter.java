@@ -1,5 +1,7 @@
 package logbook.server.proxy;
 
+import logbook.config.AppConfig;
+
 /**
  * 動作に必要なデータのみ取得するためのフィルターです。
  *
@@ -69,6 +71,7 @@ public class Filter {
      * 取得が必要なデータかを調べます<br>
      * 鎮守府サーバーが検出された場合はサーバー名とContent-Typeから必要かどうかを判別します<br>
      * 鎮守府サーバーが検出できていない場合はContent-Typeから必要かどうかを判別します<br>
+     * 中華モードのときはよく分からんけどContent-Typeを見ない
      * 
      * @param name サーバー名
      * @param contentType Content-Type
@@ -76,7 +79,7 @@ public class Filter {
      */
     public static boolean isNeed(String name, String contentType) {
         if ((!isServerDetected() || serverName.equals(name))
-                && CONTENT_TYPE_FILTER.equals(contentType)) {
+                && (AppConfig.get().isChinaMode() || CONTENT_TYPE_FILTER.equals(contentType))) {
             return true;
         }
         return false;

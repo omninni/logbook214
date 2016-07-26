@@ -16,6 +16,7 @@ import javax.json.JsonNumber;
 import javax.json.JsonObject;
 import javax.json.JsonValue;
 
+import logbook.config.AppConfig;
 import logbook.constants.AppConstants;
 import logbook.dto.ItemInfoDto;
 import logbook.dto.JsonData;
@@ -88,8 +89,8 @@ public class MasterData {
 
     private Start2Dto start2 = new Start2Dto();
 
-    /** マップクリア情報 -1: 非表示 or 未更新 0: クリアしていない 1: クリア済み */
-    private Map<Integer, Integer> mapState = new TreeMap<Integer, Integer>();
+    /** マップクリア情報  */
+    private Map<Integer, MapState> mapState2 = new HashMap<Integer, MapState>();
 
     /** 遠征クリア情報 -1: 非表示 or 未更新 0: NEW 1: 無印 2:　達成 */
     private Map<Integer, Integer> missionState = new TreeMap<Integer, Integer>();
@@ -125,7 +126,7 @@ public class MasterData {
 
     private void doMater(JsonObject data) {
         this.start2 = new Start2Dto(data);
-        this.lastUpdateTime = new Date();
+        this.lastUpdateTime = this.start2.getTime();
         modified = true;
     }
 
@@ -146,13 +147,13 @@ public class MasterData {
 
     private void doMapInfo(JsonArray json_mapinfo) {
         if (json_mapinfo != null) {
-            Map<Integer, Integer> newState = new HashMap<Integer, Integer>();
+            Map<Integer, MapState> newState = new HashMap<Integer, MapState>();
             for (JsonValue elem : json_mapinfo) {
-                JsonObject obj = (JsonObject) elem;
-                newState.put(obj.getInt("api_id"), obj.getInt("api_cleared"));
+                MapState obj = new MapState((JsonObject) elem);
+                newState.put(obj.getId(), obj);
             }
-            if (newState.equals(this.mapState) == false) {
-                this.mapState = newState;
+            if (newState.equals(this.mapState2) == false) {
+                this.mapState2 = newState;
                 this.lastUpdateTime = new Date();
                 modified = true;
             }
@@ -164,7 +165,13 @@ public class MasterData {
             Map<Integer, Integer> newState = new HashMap<Integer, Integer>();
             for (JsonValue elem : json_mission) {
                 JsonObject obj = (JsonObject) elem;
-                newState.put(obj.getInt("api_mission_id"), obj.getInt("api_state"));
+                if (AppConfig.get().isChinaMode()) {
+                    newState.put(Integer.valueOf(obj.getString("api_mission_id")),
+                            Integer.valueOf(obj.getString("api_state")));
+                }
+                else {
+                    newState.put(obj.getInt("api_mission_id"), obj.getInt("api_state"));
+                }
             }
             if (newState.equals(this.missionState) == false) {
                 this.missionState = newState;
@@ -177,15 +184,15 @@ public class MasterData {
     /**
      * @return mapState
      */
-    public Map<Integer, Integer> getMapState() {
-        return this.mapState;
+    public Map<Integer, MapState> getMapState2() {
+        return this.mapState2;
     }
 
     /**
      * @param mapState セットする mapState
      */
-    public void setMapState(Map<Integer, Integer> mapState) {
-        this.mapState = mapState;
+    public void setMapState2(Map<Integer, MapState> mapState) {
+        this.mapState2 = mapState;
     }
 
     /**
@@ -281,6 +288,8 @@ public class MasterData {
         /** UseItem　（バケツとか、家具箱とか） */
         private final Map<Integer, UseItemInfoDto> useItem = new TreeMap<Integer, UseItemInfoDto>();
 
+        private Map<Integer, String> equipType = new TreeMap<>();
+
         public Start2Dto() {
         }
 
@@ -360,6 +369,15 @@ public class MasterData {
                 for (JsonValue elem : json_useitem) {
                     UseItemInfoDto dto = new UseItemInfoDto((JsonObject) elem);
                     this.useItem.put(dto.getId(), dto);
+                }
+            }
+
+            JsonArray json_equiptype = this.json.getJsonArray("api_mst_slotitem_equiptype");
+            if (json_equiptype != null) {
+                this.equipType.clear();
+                for (JsonValue elem : json_equiptype) {
+                    JsonObject obj = (JsonObject) elem;
+                    this.equipType.put(obj.getInt("api_id"), obj.getString("api_name"));
                 }
             }
 
@@ -515,6 +533,20 @@ public class MasterData {
         }
 
         /**
+         * @return equipType
+         */
+        public Map<Integer, String> getEquipType() {
+            return this.equipType;
+        }
+
+        /**
+         * @param equipType セットする equipType
+         */
+        public void setEquipType(Map<Integer, String> equipType) {
+            this.equipType = equipType;
+        }
+
+        /**
          * @return ships
          */
         public Map<Integer, ShipInfoDto> getShips() {
@@ -596,6 +628,17 @@ public class MasterData {
          */
         public String getName() {
             return this.json.getString("api_name");
+        }
+
+        /**
+         * @return requiredDefeatCount
+         */
+        public int getRequiredDefeatCount() {
+            JsonValue json_defeat = this.json.get("api_required_defeat_count");
+            if ((json_defeat != null) && (json_defeat != JsonValue.NULL)) {
+                return ((JsonNumber) json_defeat).intValue();
+            }
+            return 0;
         }
 
     }
@@ -738,6 +781,115 @@ public class MasterData {
          */
         public String getDescription() {
             return this.json.getJsonArray("api_description").getString(0);
+        }
+    }
+
+    public static class MapState {
+        private int id;
+        private int cleared; // -1: 非表示 or 未更新 0: クリアしていない 1: クリア済み
+        private int defeatCount; // ゲージを減らした回数
+        private int maxhp;
+        private int nowhp;
+
+        public MapState() {
+        }
+
+        public MapState(JsonObject object) {
+            this.id = object.getInt("api_id");
+            this.cleared = object.getInt("api_cleared");
+            JsonValue jsonDefeat = object.get("api_defeat_count");
+            if ((jsonDefeat != null) && (jsonDefeat != JsonValue.NULL)) {
+                this.defeatCount = ((JsonNumber) jsonDefeat).intValue();
+            }
+            JsonValue jsonEventmap = object.get("api_eventmap");
+            if ((jsonEventmap != null) && (jsonEventmap != JsonValue.NULL)) {
+                JsonObject jsonEventmapObj = (JsonObject) jsonEventmap;
+                this.maxhp = jsonEventmapObj.getInt("api_max_maphp");
+                this.nowhp = jsonEventmapObj.getInt("api_now_maphp");
+            }
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj instanceof MapState) {
+                MapState o = (MapState) obj;
+                return (o.id == this.id) &&
+                        (o.cleared == this.cleared) &&
+                        (o.defeatCount == this.defeatCount) &&
+                        (o.maxhp == this.maxhp) &&
+                        (o.nowhp == this.nowhp);
+            }
+            return false;
+        }
+
+        /**
+         * @return id
+         */
+        public int getId() {
+            return this.id;
+        }
+
+        /**
+         * @param id セットする id
+         */
+        public void setId(int id) {
+            this.id = id;
+        }
+
+        /**
+         * @return cleared
+         */
+        public int getCleared() {
+            return this.cleared;
+        }
+
+        /**
+         * @param cleared セットする cleared
+         */
+        public void setCleared(int cleared) {
+            this.cleared = cleared;
+        }
+
+        /**
+         * @return defeatCount
+         */
+        public int getDefeatCount() {
+            return this.defeatCount;
+        }
+
+        /**
+         * @param defeatCount セットする defeatCount
+         */
+        public void setDefeatCount(int defeatCount) {
+            this.defeatCount = defeatCount;
+        }
+
+        /**
+         * @return maxhp
+         */
+        public int getMaxhp() {
+            return this.maxhp;
+        }
+
+        /**
+         * @param maxhp セットする maxhp
+         */
+        public void setMaxhp(int maxhp) {
+            this.maxhp = maxhp;
+        }
+
+        /**
+         * @return nowhp
+         */
+        public int getNowhp() {
+            return this.nowhp;
+        }
+
+        /**
+         * @param nowhp セットする nowhp
+         */
+        public void setNowhp(int nowhp) {
+            this.nowhp = nowhp;
         }
     }
 }

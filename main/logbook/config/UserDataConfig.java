@@ -9,6 +9,7 @@ import logbook.constants.AppConstants;
 import logbook.data.context.GlobalContext;
 import logbook.dto.DeckMissionDto;
 import logbook.dto.ItemDto;
+import logbook.dto.KdockDto;
 import logbook.internal.CondTiming;
 import logbook.internal.LoggerHolder;
 import logbook.util.BeanUtils;
@@ -23,6 +24,8 @@ public class UserDataConfig {
 
     private List<ItemDto> items;
 
+    private KdockDto[] kdocks;
+
     private DeckMissionDto[] previousMissions;
 
     private CondTiming.TimeSpan condTiming;
@@ -35,6 +38,7 @@ public class UserDataConfig {
     public static void store() throws IOException {
         UserDataConfig config = new UserDataConfig();
         config.items = new ArrayList<ItemDto>(GlobalContext.getItemMap().values());
+        config.kdocks = GlobalContext.getKdocks();
         config.previousMissions = GlobalContext.getPreviousMissions();
         config.condTiming = GlobalContext.getCondTiming().getUpdateTiming();
         config.akashiStartTime = GlobalContext.getAkashiTimer().getStartTime();
@@ -98,6 +102,20 @@ public class UserDataConfig {
      */
     public void setCondTiming(CondTiming.TimeSpan condTiming) {
         this.condTiming = condTiming;
+    }
+
+    /**
+     * @return kdocks
+     */
+    public KdockDto[] getKdocks() {
+        return this.kdocks;
+    }
+
+    /**
+     * @param kdocks セットする kdocks
+     */
+    public void setKdocks(KdockDto[] kdocks) {
+        this.kdocks = kdocks;
     }
 
     /**

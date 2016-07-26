@@ -76,7 +76,10 @@ public class DatabaseClient extends Thread {
     }
 
     public static void send(UndefinedData data) {
-        if (AppConfig.get().isSendDatabase() && (AppConfig.get().getAccessKey().length() > 0)) {
+        if (AppConfig.get().isSendDatabase()
+                && (AppConfig.get().getAccessKey().length() > 0)
+                && !AppConfig.get().isChinaMode()) // 中華モードの時は送らない
+        {
             for (String entry : sendDatabaseUrls)
             {
                 if (data.getUrl().endsWith(entry))

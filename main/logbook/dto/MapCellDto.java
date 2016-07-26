@@ -3,6 +3,7 @@
  */
 package logbook.dto;
 
+import javax.json.JsonArray;
 import javax.json.JsonObject;
 
 import logbook.internal.EnemyData;
@@ -36,6 +37,8 @@ public class MapCellDto implements Comparable<MapCellDto> {
     private int eventId = -1;
     @Tag(12)
     private int eventKind;
+    @Tag(20)
+    private int[] selectRoute;
 
     public MapCellDto(JsonObject object, boolean start) {
         this.map[0] = object.getInt("api_maparea_id");
@@ -54,6 +57,18 @@ public class MapCellDto implements Comparable<MapCellDto> {
         this.eventKind = object.getInt("api_event_kind");
         this.enemyData = EnemyData.get(this.enemyId);
         this.start = start;
+
+        JsonObject selectroute = object.getJsonObject("api_select_route");
+        if (selectroute != null) {
+            JsonArray cells = selectroute.getJsonArray("api_select_cells");
+            this.selectRoute = new int[cells.size()];
+            for (int i = 0; i < this.selectRoute.length; ++i) {
+                this.selectRoute[i] = cells.getInt(i);
+            }
+        }
+        else {
+            this.selectRoute = null;
+        }
     }
 
     private String getNextKind() {
@@ -268,6 +283,13 @@ public class MapCellDto implements Comparable<MapCellDto> {
      */
     public void setEventKind(int eventKind) {
         this.eventKind = eventKind;
+    }
+
+    /**
+     * @return selectRoute
+     */
+    public int[] getSelectRoute() {
+        return this.selectRoute;
     }
 
 }

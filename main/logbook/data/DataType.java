@@ -23,6 +23,8 @@ public enum DataType {
     SHIP3("/kcsapi/api_get_member/ship3"),
     /** 出撃中の更新 */
     SHIP_DECK("/kcsapi/api_get_member/ship_deck"),
+    /** 遠征(開始) */
+    MISSION_START("/kcsapi/api_req_mission/start"),
     /** 遠征(帰還) */
     MISSION_RESULT("/kcsapi/api_req_mission/result"),
     /** 基本 */
@@ -87,6 +89,10 @@ public enum DataType {
     LOCK_SLOTITEM("/kcsapi/api_req_kaisou/lock"),
     /** 装備改修 */
     REMODEL_SLOT("/kcsapi/api_req_kousyou/remodel_slot"),
+    /** 改修工廠装備アイテムリスト */
+    REMODEL_SLOTLIST("/kcsapi/api_req_kousyou/remodel_slotlist"),
+    /** 装備改修詳細 */
+    REMODEL_SLOTLIST_DETAIL("/kcsapi/api_req_kousyou/remodel_slotlist_detail"),
     /** 出撃 */
     START("/kcsapi/api_req_map/start"),
     /** 進撃 */
@@ -117,6 +123,8 @@ public enum DataType {
     NYUKYO_START("/kcsapi/api_req_nyukyo/start"),
     /** 高速修復 */
     NYUKYO_SPEEDCHANGE("/kcsapi/api_req_nyukyo/speedchange"),
+    /** 装備アイテム順 */
+    UNSETSLOT("/kcsapi/api_get_member/unsetslot"),
     /** 改造 */
     REMODELING("/kcsapi/api_req_kaisou/remodeling"),
     /** 疲労度回復アイテム使用 */

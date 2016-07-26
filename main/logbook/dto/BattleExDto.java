@@ -134,7 +134,7 @@ public class BattleExDto extends AbstractDto {
     private int mvpCombined;
 
     /** 提督Lv */
-    @Tag(27)
+    @Tag(29)
     private int hqLv;
 
     /** 
@@ -168,6 +168,13 @@ public class BattleExDto extends AbstractDto {
     /** 次の連合艦隊ではこうなりそう(ならなかったら轟沈艦を取り除くことができないので処理を再考する必要あり) */
     //@Tag(45)
     //private boolean[] lostflagCombined;
+
+    /** ダメコンが発動したか */
+    @Tag(61)
+    private boolean[] dmgctrl;
+
+    @Tag(62)
+    private boolean[] dmgctrlCombined;
 
     @Tag(51)
     private String resultJson;
@@ -342,7 +349,7 @@ public class BattleExDto extends AbstractDto {
             this.json = object.toString();
         }
 
-        public void battleDamage(BattleExDto battle) {
+        public void battleDamage(BattleExDto battle, boolean[] dmgctrl, boolean[] dmgctrlCombined) {
             int numFships = this.nowFriendHp.length;
             int numEships = this.nowEnemyHp.length;
             boolean isCombined = (this.nowFriendHpCombined != null);
@@ -350,7 +357,7 @@ public class BattleExDto extends AbstractDto {
 
             // HP0以下を0にする
             for (int i = 0; i < numFships; i++) {
-                this.nextHp(i, this.nowFriendHp, battle.getDock().getShips());
+                this.nextHp(i, this.nowFriendHp, battle.getDock().getShips(), dmgctrl);
             }
             for (int i = 0; i < numEships; i++) {
                 if (this.nowEnemyHp[i] <= 0)
@@ -358,7 +365,7 @@ public class BattleExDto extends AbstractDto {
             }
             if (isCombined) {
                 for (int i = 0; i < numFshipsCombined; i++) {
-                    this.nextHp(i, this.nowFriendHpCombined, battle.getDockCombined().getShips());
+                    this.nextHp(i, this.nowFriendHpCombined, battle.getDockCombined().getShips(), dmgctrlCombined);
                 }
             }
 
@@ -392,7 +399,7 @@ public class BattleExDto extends AbstractDto {
             this.estimatedRank = this.calcResultRank(battle);
         }
 
-        private void nextHp(int index, int[] hps, List<ShipDto> ships) {
+        private void nextHp(int index, int[] hps, List<ShipDto> ships, boolean[] dmgctrl) {
             int hp = hps[index];
             ShipDto ship = ships.get(index);
             if (hp <= 0) {
@@ -402,9 +409,11 @@ public class BattleExDto extends AbstractDto {
                     if (item == null)
                         continue;
                     if (item.getSlotitemId() == 42) { //応急修理要員
+                        dmgctrl[index] = true;
                         hps[index] = (int) (ship.getMaxhp() * 0.2);
                         return;
                     } else if (item.getSlotitemId() == 43) { //応急修理女神
+                        dmgctrl[index] = true;
                         hps[index] = ship.getMaxhp();
                         return;
                     }
@@ -967,9 +976,11 @@ public class BattleExDto extends AbstractDto {
             this.startEnemyHp = new int[numEships];
             this.maxFriendHp = new int[numFships];
             this.maxEnemyHp = new int[numEships];
+            this.dmgctrl = new boolean[numFships];
             if (isCombined) {
                 this.startFriendHpCombined = new int[numFshipsCombined];
                 this.maxFriendHpCombined = new int[numFshipsCombined];
+                this.dmgctrlCombined = new boolean[numFshipsCombined];
             }
             else {
                 this.maxFriendHpCombined = null;
@@ -1060,7 +1071,7 @@ public class BattleExDto extends AbstractDto {
             phase.practiceDamage(this);
         }
         else {
-            phase.battleDamage(this);
+            phase.battleDamage(this, this.dmgctrl, this.dmgctrlCombined);
         }
         this.phaseList.add(phase);
     }
@@ -1101,6 +1112,13 @@ public class BattleExDto extends AbstractDto {
         this.mvp = object.getInt("api_mvp");
         if (JsonUtils.hasKey(object, "api_mvp_combined")) {
             this.mvpCombined = object.getInt("api_mvp_combined");
+        }
+        if (JsonUtils.hasKey(object, "api_escape")) {
+            JsonObject jsonEscape = object.getJsonObject("api_escape");
+            this.escapeInfo = new int[] {
+                    jsonEscape.getJsonArray("api_escape_idx").getInt(0) - 1,
+                    jsonEscape.getJsonArray("api_tow_idx").getInt(0) - 1
+            };
         }
         this.hqLv = object.getInt("api_member_lv");
         if (JsonUtils.hasKey(object, "api_escape")) {
@@ -1643,6 +1661,34 @@ public class BattleExDto extends AbstractDto {
      */
     public boolean[] getLostflag() {
         return this.lostflag;
+    }
+
+    /**
+     * @return dmgctrl
+     */
+    public boolean[] getDmgctrl() {
+        return this.dmgctrl;
+    }
+
+    /**
+     * @param dmgctrl セットする dmgctrl
+     */
+    public void setDmgctrl(boolean[] dmgctrl) {
+        this.dmgctrl = dmgctrl;
+    }
+
+    /**
+     * @return dmgctrlCombined
+     */
+    public boolean[] getDmgctrlCombined() {
+        return this.dmgctrlCombined;
+    }
+
+    /**
+     * @param dmgctrlCombined セットする dmgctrlCombined
+     */
+    public void setDmgctrlCombined(boolean[] dmgctrlCombined) {
+        this.dmgctrlCombined = dmgctrlCombined;
     }
 
     /**

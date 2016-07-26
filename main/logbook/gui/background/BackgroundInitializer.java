@@ -18,6 +18,7 @@ import logbook.internal.LoggerHolder;
 import logbook.internal.MasterData;
 import logbook.internal.ShipParameterRecord;
 import logbook.server.proxy.ProxyServer;
+import logbook.server.web.WebServer;
 
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Shell;
@@ -47,6 +48,9 @@ public final class BackgroundInitializer extends Thread {
         try {
             // プロキシサーバーを開始する
             ProxyServer.start();
+
+            // Webサーバーを開始する
+            WebServer.start(AppConfig.get().getListenPort() + 1);
 
         } catch (Exception e) {
             LOG.get().warn("サーバ起動に失敗しました", e);
